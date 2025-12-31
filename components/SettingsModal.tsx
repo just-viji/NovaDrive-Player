@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, ShieldCheck, HelpCircle, AlertTriangle, Copy, Check, Globe, Smartphone } from 'lucide-react';
+import { X, Save, ShieldCheck, HelpCircle, AlertTriangle, Copy, Check, Globe, Smartphone, ExternalLink } from 'lucide-react';
 import { driveService } from '../services/googleDriveService';
 
 interface SettingsModalProps {
@@ -85,49 +85,53 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1"><Globe size={10} /> Solution 1 (Recommended)</p>
                           <p className="text-xs text-slate-300">Deploy this app to <span className="text-white font-medium">Vercel</span> or <span className="text-white font-medium">Netlify</span>. This gives you a public HTTPS URL that Google accepts.</p>
                        </div>
-                       <div className="bg-slate-900/50 p-2 rounded border border-red-500/20">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1"><Smartphone size={10} /> Solution 2 (For Devs)</p>
-                          <p className="text-xs text-slate-300">Use a tunneling tool like <span className="text-white font-mono">ngrok</span> on your PC to create a public URL:</p>
-                          <code className="block bg-black/30 p-1 mt-1 rounded text-[10px] font-mono text-green-400">ngrok http 3000</code>
-                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Standard Origin Helper */}
-            <div className={`rounded-lg p-4 border ${isSecure && !isPrivateNetworkIP ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-800/30 border-slate-700'}`}>
-              <div className="flex items-start gap-3 mb-3">
-                <div className={`p-1.5 rounded-md ${isPrivateNetworkIP ? 'bg-slate-700' : 'bg-blue-500/10'}`}>
-                   {isPrivateNetworkIP ? <AlertTriangle size={16} className="text-slate-400"/> : <Check size={16} className="text-blue-400" />}
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200">
-                    Authorized JavaScript Origin
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Copy the URL below and add it to your Google Cloud Console Credentials.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 bg-slate-950 rounded border border-slate-800 p-2">
-                <code className={`text-xs flex-1 truncate font-mono ${isPrivateNetworkIP ? 'text-red-400 line-through decoration-red-500/50' : 'text-emerald-400'}`}>
-                    {origin}
-                </code>
-                <button 
-                  onClick={copyOrigin}
-                  className="text-slate-500 hover:text-white transition-colors"
-                  title="Copy URL"
+            {/* Steps to Fix "Origin Mismatch" */}
+            <div className={`rounded-xl p-5 border ${isSecure && !isPrivateNetworkIP ? 'bg-blue-500/5 border-blue-500/20' : 'bg-slate-800/30 border-slate-700'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Globe size={16} className="text-blue-400" />
+                  Setup Instructions
+                </h3>
+                <a 
+                  href="https://console.cloud.google.com/apis/credentials" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[10px] flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/10 px-2 py-1 rounded-full"
                 >
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                </button>
+                  Open Google Console <ExternalLink size={10} />
+                </a>
               </div>
               
+              <ol className="list-decimal list-inside space-y-3 text-xs text-slate-300">
+                <li>Go to <strong>APIs & Services {'>'} Credentials</strong>.</li>
+                <li>Edit your <strong>OAuth 2.0 Client ID</strong>.</li>
+                <li>
+                  <span className="block mb-1">Add this URL to <strong>Authorized JavaScript origins</strong>:</span>
+                  <div className="flex items-center gap-2 bg-slate-950 rounded border border-slate-800 p-2 mt-1">
+                    <code className={`text-xs flex-1 truncate font-mono ${isPrivateNetworkIP ? 'text-red-400 line-through decoration-red-500/50' : 'text-emerald-400'}`}>
+                        {origin}
+                    </code>
+                    <button 
+                      onClick={copyOrigin}
+                      className="text-slate-500 hover:text-white transition-colors"
+                      title="Copy URL"
+                    >
+                      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                </li>
+                <li className="text-amber-200/80">Wait 5-10 minutes for changes to propagate!</li>
+              </ol>
+
               {!isSecure && !isPrivateNetworkIP && (
-                 <p className="text-xs text-amber-500 mt-2 font-medium flex items-center gap-1">
-                   <AlertTriangle size={12} /> Google requires HTTPS (unless localhost).
+                 <p className="text-xs text-amber-500 mt-3 font-medium flex items-center gap-1 bg-amber-500/10 p-2 rounded">
+                   <AlertTriangle size={12} /> Google requires HTTPS. This won't work on http:// unless it's localhost.
                  </p>
               )}
             </div>
