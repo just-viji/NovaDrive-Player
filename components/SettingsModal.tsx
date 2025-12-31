@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, ShieldCheck, HelpCircle, AlertTriangle, Copy, Check, Globe, Smartphone, ExternalLink } from 'lucide-react';
+import { X, Save, ShieldCheck, HelpCircle, AlertTriangle, Copy, Check, Globe, ExternalLink, Users, AlertCircle } from 'lucide-react';
 import { driveService } from '../services/googleDriveService';
 
 interface SettingsModalProps {
@@ -69,34 +69,61 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
           <div className="space-y-6">
             
-            {/* Critical Warning for Mobile/LAN Users */}
-            {isPrivateNetworkIP && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle size={24} className="text-red-500 shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-bold text-red-200">Local Network Access Detected</h3>
-                    <p className="text-xs text-red-200/80 mt-1 leading-relaxed">
-                      You are accessing this app via a Private IP ({hostname}). <br/>
-                      <strong className="text-white">Google OAuth DOES NOT support private IP addresses.</strong> You cannot add this URL to the Google Cloud Console.
-                    </p>
-                    <div className="mt-3 grid gap-2">
-                       <div className="bg-slate-900/50 p-2 rounded border border-red-500/20">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1"><Globe size={10} /> Solution 1 (Recommended)</p>
-                          <p className="text-xs text-slate-300">Deploy this app to <span className="text-white font-medium">Vercel</span> or <span className="text-white font-medium">Netlify</span>. This gives you a public HTTPS URL that Google accepts.</p>
-                       </div>
+            {/* Troubleshooting 400 Errors (Origin Mismatch) - PRIORITY */}
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="text-rose-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-rose-100">Getting "Error 400: invalid_request"?</h3>
+                  <p className="text-xs text-rose-200/70 mt-1 mb-2">
+                    This error means your current browser URL is NOT listed in Google Cloud.
+                  </p>
+                  
+                  <div className="bg-slate-900/80 p-3 rounded border border-rose-500/30 mb-2 relative group">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Add this EXACT URL to Authorized Origins:</p>
+                    <div className="flex items-center gap-2">
+                        <code className="text-xs text-emerald-400 font-mono flex-1 break-all select-all">{origin}</code>
+                        <button 
+                          onClick={copyOrigin} 
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300 transition-colors"
+                          title="Copy to clipboard"
+                        >
+                          {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                        </button>
                     </div>
                   </div>
+
+                  <p className="text-[11px] text-rose-200/60 leading-tight">
+                    <strong>Vercel Users:</strong> Deployment previews (e.g., <code>app-git-main.vercel.app</code>) are different from production. You must add the <strong>specific URL</strong> you are visiting right now.
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Steps to Fix "Origin Mismatch" */}
+            {/* Troubleshooting 403 Errors (Test Users) */}
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <Users size={20} className="text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-amber-100">Getting "Error 403: access_denied"?</h3>
+                  <p className="text-xs text-amber-200/70 mt-1 mb-2">
+                    If your app is in <strong>Testing</strong> mode, you must explicitly add your email.
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-xs text-slate-300 marker:text-amber-500/50">
+                    <li>Go to <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" className="text-blue-400 hover:underline">OAuth consent screen</a>.</li>
+                    <li>Scroll down to <strong>Test users</strong>.</li>
+                    <li>Click <strong>+ ADD USERS</strong> and enter your email.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            {/* General Instructions */}
             <div className={`rounded-xl p-5 border ${isSecure && !isPrivateNetworkIP ? 'bg-blue-500/5 border-blue-500/20' : 'bg-slate-800/30 border-slate-700'}`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Globe size={16} className="text-blue-400" />
-                  Setup Instructions
+                  Quick Links
                 </h3>
                 <a 
                   href="https://console.cloud.google.com/apis/credentials" 
@@ -104,33 +131,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   rel="noopener noreferrer"
                   className="text-[10px] flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/10 px-2 py-1 rounded-full"
                 >
-                  Open Google Console <ExternalLink size={10} />
+                  Open Google Cloud Console <ExternalLink size={10} />
                 </a>
               </div>
               
-              <ol className="list-decimal list-inside space-y-3 text-xs text-slate-300">
-                <li>Go to <strong>APIs & Services {'>'} Credentials</strong>.</li>
-                <li>Edit your <strong>OAuth 2.0 Client ID</strong>.</li>
-                <li>
-                  <span className="block mb-1">Add this URL to <strong>Authorized JavaScript origins</strong>:</span>
-                  <div className="flex items-center gap-2 bg-slate-950 rounded border border-slate-800 p-2 mt-1">
-                    <code className={`text-xs flex-1 truncate font-mono ${isPrivateNetworkIP ? 'text-red-400 line-through decoration-red-500/50' : 'text-emerald-400'}`}>
-                        {origin}
-                    </code>
-                    <button 
-                      onClick={copyOrigin}
-                      className="text-slate-500 hover:text-white transition-colors"
-                      title="Copy URL"
-                    >
-                      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                    </button>
-                  </div>
-                </li>
-                <li className="text-amber-200/80">Wait 5-10 minutes for changes to propagate!</li>
-              </ol>
-
               {!isSecure && !isPrivateNetworkIP && (
-                 <p className="text-xs text-amber-500 mt-3 font-medium flex items-center gap-1 bg-amber-500/10 p-2 rounded">
+                 <p className="text-xs text-amber-500 font-medium flex items-center gap-1 bg-amber-500/10 p-2 rounded">
                    <AlertTriangle size={12} /> Google requires HTTPS. This won't work on http:// unless it's localhost.
                  </p>
               )}
