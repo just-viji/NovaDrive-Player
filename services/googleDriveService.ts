@@ -4,6 +4,8 @@ import { GOOGLE_CLIENT_ID, ALLOWED_USER_EMAIL } from "../constants";
 
 // Added userinfo.email scope to verify user identity
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email';
+const STORAGE_KEY_TOKEN = 'nova_drive_token';
+const STORAGE_KEY_EXPIRY = 'nova_drive_token_expiry';
 
 export class GoogleDriveService {
   private accessToken: string | null = null;
@@ -33,6 +35,43 @@ export class GoogleDriveService {
     return this.clientId;
   }
 
+  // --- Persistence Logic ---
+
+  public getStoredToken(): string | null {
+    if (typeof localStorage === 'undefined') return null;
+    
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    const expiryStr = localStorage.getItem(STORAGE_KEY_EXPIRY);
+    
+    if (!token || !expiryStr) return null;
+
+    const expiry = parseInt(expiryStr, 10);
+    // Add a 5 minute buffer to be safe
+    if (Date.now() > expiry - 5 * 60 * 1000) {
+      this.clearStoredToken();
+      return null;
+    }
+
+    this.accessToken = token;
+    return token;
+  }
+
+  private saveToken(token: string, expiresInSeconds: number) {
+    if (typeof localStorage === 'undefined') return;
+    const expiryTime = Date.now() + (expiresInSeconds * 1000);
+    localStorage.setItem(STORAGE_KEY_TOKEN, token);
+    localStorage.setItem(STORAGE_KEY_EXPIRY, expiryTime.toString());
+  }
+
+  public clearStoredToken() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+    localStorage.removeItem(STORAGE_KEY_EXPIRY);
+    this.accessToken = null;
+  }
+
+  // -------------------------
+
   private initTokenClient() {
     if (!this.clientId) return;
 
@@ -47,6 +86,8 @@ export class GoogleDriveService {
               return;
             }
             this.accessToken = response.access_token;
+            // Implicit flow tokens usually last 3600s (1 hour)
+            this.saveToken(response.access_token, response.expires_in || 3599);
           },
         });
       } catch (e) {
@@ -105,6 +146,7 @@ export class GoogleDriveService {
           await this.verifyUser(response.access_token);
           
           this.accessToken = response.access_token;
+          this.saveToken(response.access_token, parseInt(response.expires_in || '3599', 10));
           resolve(this.accessToken!);
         } catch (e) {
           reject(e);
@@ -128,6 +170,11 @@ export class GoogleDriveService {
     );
 
     if (!response.ok) {
+        // If 401, token might have expired despite our checks
+        if (response.status === 401) {
+          this.clearStoredToken();
+          throw new Error("Session expired. Please reconnect.");
+        }
         throw new Error(`Drive API Error: ${response.statusText}`);
     }
 

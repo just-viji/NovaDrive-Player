@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Player from './components/Player';
 import SettingsModal from './components/SettingsModal';
@@ -17,6 +17,45 @@ const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Player State
+  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Auto-connect on mount if token is stored
+  useEffect(() => {
+    const autoConnect = async () => {
+      const storedToken = driveService.getStoredToken();
+      if (storedToken) {
+        setIsConnected(true);
+        try {
+          // If we have a token, just fetch files immediately
+          // We don't set isSyncing true here to avoid blocking UI immediately, 
+          // or we can to show it's loading content. Let's do it gently.
+          setIsSyncing(true);
+          const driveTracks = await driveService.fetchAudioFiles();
+          if (driveTracks.length > 0) {
+            setTracks(driveTracks);
+            if (isShuffle) {
+              setShuffledTracks(shuffleArray(driveTracks));
+            }
+            setCurrentTrack(driveTracks[0]);
+          }
+        } catch (error) {
+          console.error("Auto-sync failed:", error);
+          setIsConnected(false);
+          driveService.clearStoredToken();
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    };
+    
+    // Tiny delay to ensure Google script loaded if needed, though not strictly required for local storage check
+    setTimeout(autoConnect, 500);
+  }, []); // Run once on mount
 
   const handleConnectDrive = async () => {
     try {
@@ -26,6 +65,10 @@ const App: React.FC = () => {
       
       if (driveTracks.length > 0) {
         setTracks(driveTracks);
+        // If shuffle is on, reshuffle new tracks
+        if (isShuffle) {
+          setShuffledTracks(shuffleArray(driveTracks));
+        }
         setCurrentTrack(driveTracks[0]);
         setIsConnected(true);
       }
@@ -55,17 +98,77 @@ const App: React.FC = () => {
     }
   };
 
+  const shuffleArray = (array: Track[]) => {
+    const newArr = [...array];
+    for (let i = newArr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+    }
+    return newArr;
+  };
+
+  const toggleShuffle = useCallback(() => {
+    setIsShuffle(prev => {
+      const newState = !prev;
+      if (newState) {
+        setShuffledTracks(shuffleArray(tracks));
+      }
+      return newState;
+    });
+  }, [tracks]);
+
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode(prev => {
+      if (prev === 'none') return 'all';
+      if (prev === 'all') return 'one';
+      return 'none';
+    });
+  }, []);
+
   const handleNext = useCallback(() => {
-    const currentIndex = tracks.findIndex(t => t.id === currentTrack?.id);
-    const nextIndex = (currentIndex + 1) % tracks.length;
-    handleTrackSelect(tracks[nextIndex]);
-  }, [currentTrack, tracks]);
+    if (!currentTrack) return;
+    
+    const queue = isShuffle ? shuffledTracks : tracks;
+    const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+    
+    let nextIndex = currentIndex + 1;
+    
+    // Wrap around logic
+    if (nextIndex >= queue.length) {
+      if (repeatMode === 'none' && !isShuffle) {
+        nextIndex = 0; 
+      } else {
+        nextIndex = 0;
+      }
+    }
+    
+    if (queue[nextIndex]) {
+      handleTrackSelect(queue[nextIndex]);
+    }
+  }, [currentTrack, tracks, shuffledTracks, isShuffle, repeatMode]);
 
   const handlePrevious = useCallback(() => {
-    const currentIndex = tracks.findIndex(t => t.id === currentTrack?.id);
-    const prevIndex = (currentIndex - 1 + tracks.length) % tracks.length;
-    handleTrackSelect(tracks[prevIndex]);
-  }, [currentTrack, tracks]);
+    if (!currentTrack) return;
+
+    const queue = isShuffle ? shuffledTracks : tracks;
+    const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+    
+    let prevIndex = currentIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = queue.length - 1;
+    }
+
+    if (queue[prevIndex]) {
+      handleTrackSelect(queue[prevIndex]);
+    }
+  }, [currentTrack, tracks, shuffledTracks, isShuffle]);
+
+  // Sync shuffled tracks if main track list changes
+  useEffect(() => {
+    if (isShuffle) {
+      setShuffledTracks(shuffleArray(tracks));
+    }
+  }, [tracks]);
 
   const filteredTracks = tracks.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -249,7 +352,17 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <Player track={currentTrack} onNext={handleNext} onPrevious={handlePrevious} />
+      <Player 
+        track={currentTrack} 
+        onNext={handleNext} 
+        onPrevious={handlePrevious} 
+        repeatMode={repeatMode}
+        isShuffle={isShuffle}
+        toggleRepeat={toggleRepeat}
+        toggleShuffle={toggleShuffle}
+        isFullScreen={isFullScreen}
+        onToggleFullScreen={() => setIsFullScreen(!isFullScreen)}
+      />
 
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
